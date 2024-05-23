@@ -1,6 +1,6 @@
-﻿#region Directives
-
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Isam.Esent.Interop;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -10,7 +10,7 @@ using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc4.Interfaces;
 using Xbim.ModelGeometry.Scene.Extensions;
 
-#endregion
+#nullable enable
 
 namespace Xbim.ModelGeometry.Scene
 {
@@ -20,15 +20,47 @@ namespace Xbim.ModelGeometry.Scene
         /// This function centralises the extraction of a product placement, but it needs the support of XbimPlacementTree and an XbimGeometryEngine
         /// We should probably find a conceptual place for it somewhere in the scene, where these are cached.
         /// </summary>
-        public static XbimMatrix3D GetTransform(IIfcProduct product, XbimPlacementTree tree, IXbimGeometryEngine engine)
+        public static XbimMatrix3D GetTransform(IIfcProduct product, XbimPlacementTree tree, IXbimGeometryEngine engine, ILogger? logger = null)
         {
-            XbimMatrix3D placementTransform = XbimMatrix3D.Identity;
-            if (product.ObjectPlacement is IIfcLocalPlacement)
-                placementTransform = tree[product.ObjectPlacement.EntityLabel];
-            else if (product.ObjectPlacement is IIfcGridPlacement)
-                placementTransform = engine.ToMatrix3D((IIfcGridPlacement)product.ObjectPlacement,null);
-            return placementTransform;
+            _ = tree.TryGetTransform(product.ObjectPlacement, out var result, engine, logger);
+            return result;
         }
+
+        internal bool TryGetTransform(IIfcObjectPlacement objectPlacement, out XbimMatrix3D found, IXbimGeometryEngine? engine = null, ILogger? logger = null)
+        {
+            if (objectPlacement is not null)
+            {
+                if (Nodes.TryGetValue(objectPlacement.EntityLabel, out var node))
+                {
+                    found = node!.Matrix;
+                    return true;
+                }
+                else
+                {
+					if (engine is null)
+                    {
+						found = XbimMatrix3D.Identity;
+						return false;
+					}
+                    //	placementTransform = tree[product.ObjectPlacement.EntityLabel];
+                    else
+                    {
+                        var newNode = new XbimPlacementNode(objectPlacement, logger, engine);
+                        Nodes.Add(objectPlacement.EntityLabel, newNode);
+						// todo: we should set the parent nodes before converting to global! 
+						newNode.ToGlobalMatrix();
+                        found = newNode.Matrix;
+                        return true;
+                    }
+				}
+            }
+            else
+            {
+                found = XbimMatrix3D.Identity;
+                return false;
+            }
+        }
+
 
         /// <summary>
         ///     Builds a placement tree of all ifcLocalPlacements
@@ -39,19 +71,24 @@ namespace Xbim.ModelGeometry.Scene
         ///     Coordinate System. Useful for models where the site has been located into a geographical context
         /// </param>
         /// <param name="logger">optional logging target</param>
-        public XbimPlacementTree(IModel model, bool adjustWcs = true, ILogger logger = null)
+        /// <param name="engine">The geometry engine is needed to compute some of the most complex placementss</param>
+        public XbimPlacementTree(IModel model, bool adjustWcs = true, ILogger? logger = null, IXbimGeometryEngine? engine = null)
         {
             var rootNodes = new List<XbimPlacementNode>();
-            var localPlacements = model.Instances.OfType<IIfcLocalPlacement>(true).ToList();
+            var objectPlacements = model.Instances.OfType<IIfcObjectPlacement>(true).ToList();
+
+            // populate the nodes
             Nodes = new Dictionary<int, XbimPlacementNode>();
-            foreach (var placement in localPlacements)
-                Nodes.Add(placement.EntityLabel, new XbimPlacementNode(placement));
-            foreach (var localPlacement in localPlacements)
+            foreach (var placement in objectPlacements)
+                Nodes.Add(placement.EntityLabel, new XbimPlacementNode(placement, logger, engine));
+
+            // traverse the nodes to complete their initialization, they are either root or not
+            foreach (var objPlacement in objectPlacements)
             {
-                if (localPlacement.PlacementRelTo != null) //resolve parent
+                if (TryGetPlacementRelTo(objPlacement, out var relPlacement))
                 {
-                    var xbimPlacement = Nodes[localPlacement.EntityLabel];
-                    if (Nodes.TryGetValue(localPlacement.PlacementRelTo.EntityLabel, out var relTo))
+                    var xbimPlacement = Nodes[objPlacement.EntityLabel];
+                    if (Nodes.TryGetValue(relPlacement.EntityLabel, out var relTo))
                     {
                         var xbimPlacementParent = relTo;
                         xbimPlacement.Parent = xbimPlacementParent;
@@ -59,23 +96,48 @@ namespace Xbim.ModelGeometry.Scene
                     }
                     else
                     {
-                        logger?.LogError("PlacementRelTo entity #{RelToEntityLabel} not found; adding #{PlacedEntity} as root node.", localPlacement.PlacementRelTo.EntityLabel, localPlacement.EntityLabel);
-                        rootNodes.Add(Nodes[localPlacement.EntityLabel]);
+                        logger?.LogError("PlacementRelTo entity #{RelToEntityLabel} not found; adding #{PlacedEntity} as root node.", relPlacement.EntityLabel, objPlacement.EntityLabel);
+                        rootNodes.Add(Nodes[objPlacement.EntityLabel]);
                     }
                 }
                 else
-                    rootNodes.Add(Nodes[localPlacement.EntityLabel]);
+                    rootNodes.Add(Nodes[objPlacement.EntityLabel]);
             }
-            if (adjustWcs && rootNodes.Count == 1)
+
+            // if we only have one root node, then we set the WorldCoordinateSystem and remove that node
+            //
+            var topNodes = rootNodes.ToList();
+            if (adjustWcs && topNodes.Count == 1)
             {
-                var root = rootNodes[0];
+                var root = topNodes[0];
                 WorldCoordinateSystem = root.Matrix;
-                //make the children parentless
-                foreach (var node in Nodes.Values.Where(node => node.Parent == root)) node.Parent = null;
-                root.Matrix = new XbimMatrix3D(); //set the matrix to identity
+				// set the root matrix to identity
+				root.Matrix = XbimMatrix3D.Identity;
+
+                // todo: we could flatten te subsequent transform if still just one, changing this if into a while loop, 
+                // but we first need to workout how to build the cumulative transform
+                // would it be a or b?
+                // a) wcs = wcs * newComponent;
+                // b) wcs = newComponent * wcs; <- probably the right one, but it needs testing
+
+                //make its children parentless // this probably would not be needed
+				foreach (var node in Nodes.Values.Where(node => node.Parent == root))
+                    node.Parent = null;
             }
-            //muliply out the matrices
-            foreach (var node in Nodes.Values) node.ToGlobalMatrix();
+            // muliply out the matrices
+            foreach (var node in Nodes.Values)
+                node.ToGlobalMatrix();
+        }
+
+        private static bool TryGetPlacementRelTo(IIfcObjectPlacement objPlacement, [NotNullWhen(true)] out IIfcObjectPlacement? relPlacement)
+        {
+            relPlacement = objPlacement switch
+            {
+                Ifc4x3.GeometricConstraintResource.IfcObjectPlacement objPlac4xc3 => objPlac4xc3.PlacementRelTo, // PlacementRelTo has been moved to the supertype in Ifc4x3
+                IIfcLocalPlacement interfaceLocalPlacement => interfaceLocalPlacement.PlacementRelTo,
+                _ => null,
+            };
+            return relPlacement is not null;
         }
 
         public XbimMatrix3D WorldCoordinateSystem { get; private set; }
@@ -89,35 +151,60 @@ namespace Xbim.ModelGeometry.Scene
 
         public class XbimPlacementNode
         {
-            private List<XbimPlacementNode> _children;
+            private List<XbimPlacementNode>? _children;
             private bool _isAdjustedToGlobal;
 
-            public XbimPlacementNode(IIfcLocalPlacement placement)
+            /// <summary>
+            /// Standard constructor
+            /// </summary>
+            /// <param name="placement"></param>
+            /// <param name="logger"></param>
+            /// <param name="engine">required for some of the <see cref="IIfcObjectPlacement"/> types</param>
+            public XbimPlacementNode(IIfcObjectPlacement placement, ILogger? logger = null, IXbimGeometryEngine? engine = null)
             {
                 PlacementLabel = placement.EntityLabel;
-                Matrix = placement.RelativePlacement.ToMatrix3D();
+                if (placement is IIfcLocalPlacement interfaceLocalPlacement)
+                {
+                    Matrix = interfaceLocalPlacement.RelativePlacement.ToMatrix3D();
+                }
+                else if (engine is null)
+				{
+					logger?.LogError("XbimPlacementNode for entity #{label} of type {type} needs a non null engine parameter. An identity matrix was used instead, related objects might result misplaced.", placement.EntityLabel, placement.GetType().Name);
+					Matrix = XbimMatrix3D.Identity;
+				}
+				else if (placement is IIfcLinearPlacement interfaceLinearPlacement)
+                {
+                    Matrix = engine.ToMatrix3D(interfaceLinearPlacement, logger);
+                }
+                else if (placement is IIfcGridPlacement interfaceGridPlacement)
+				{
+					Matrix = engine.ToMatrix3D(interfaceGridPlacement, logger);
+				}
+				else
+                {
+                    logger?.LogError("XbimPlacementNode for entity #{label} of type {type} is not implemented. An identity matrix was used instead, related objects might result misplaced.", placement.EntityLabel, placement.GetType().Name);
+                    Matrix = XbimMatrix3D.Identity;
+                }
                 _isAdjustedToGlobal = false;
             }
 
             public int PlacementLabel { get; private set; }
             public XbimMatrix3D Matrix { get; protected internal set; }
 
-            public List<XbimPlacementNode> Children
-            {
-                get { return _children ?? (_children = new List<XbimPlacementNode>()); }
-            }
+            public List<XbimPlacementNode> Children => _children ??= new List<XbimPlacementNode>();
 
-            public XbimPlacementNode Parent { get; set; }
+            public XbimPlacementNode? Parent { get; set; } = null;
 
             internal void ToGlobalMatrix()
             {
                 if (!_isAdjustedToGlobal && Parent != null)
                 {
                     Parent.ToGlobalMatrix();
-                    Matrix = Matrix*Parent.Matrix;
+                    Matrix *= Parent.Matrix;
                 }
                 _isAdjustedToGlobal = true;
             }
         }
     }
 }
+#nullable restore

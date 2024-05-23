@@ -249,6 +249,8 @@ namespace Xbim
 					return BuildExtrudedAreaSolidTapered(static_cast<IIfcExtrudedAreaSolidTapered^>(ifcSolid));
 				case XSolidModelType::IfcAdvancedBrep:
 					return BuildAdvancedBrep(static_cast<IIfcAdvancedBrep^>(ifcSolid));
+				case XSolidModelType::IfcSectionedSolidHorizontal: // todo: new entity in IFC4x1, still not handles
+					throw RaiseGeometryFactoryException("Unsupported solidmodel type", ifcSolid); 
 				//TODO: SRL: the following methods will need to be implemented as Version 6, defaulting to version 5 implementation	
 				case XSolidModelType::IfcAdvancedBrepWithVoids:
 					return gcnew XbimSolid(static_cast<IIfcAdvancedBrepWithVoids^>(ifcSolid), Logger(), _modelService);
@@ -262,9 +264,10 @@ namespace Xbim
 					return gcnew XbimSolid(static_cast<IIfcRevolvedAreaSolidTapered^>(ifcSolid), Logger(), _modelService);
 
 				default:
+					throw RaiseGeometryFactoryException("Not implemented. SolidModel type", ifcSolid);
 					break;
 				}
-				throw RaiseGeometryFactoryException("Not implemented. SolidModel type", ifcSolid);
+				
 			}
 			
 			TopoDS_Shape SolidFactory::BuildSurfaceCurveSweptAreaSolid(IIfcSurfaceCurveSweptAreaSolid^ ifcSurfaceCurveSweptAreaSolid)

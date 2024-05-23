@@ -53,13 +53,24 @@ namespace XbimRegression
                     };
                     fileLoggerOpts.MinLevel = LogLevel.Trace;
                 }));
+
             // Configure xbim services / logging & geometry
-            XbimServices.Current.ConfigureServices(services => services
-                .AddXbimToolkit(opt => opt
-                    .AddLoggerFactory(_loggerFactory)
-                    // .AddHeuristicModel()
-                    .AddGeometryServices(builder => builder.Configure(c => c.GeometryEngineVersion = XGeometryEngineVersion.V6))));
-            
+            if (Params.Caching) // prepares model to be able to save
+            {
+				XbimServices.Current.ConfigureServices(services => services
+				.AddXbimToolkit(opt => opt
+					.AddLoggerFactory(_loggerFactory)
+					.AddEsentModel()
+					.AddGeometryServices(builder => builder.Configure(c => c.GeometryEngineVersion = XGeometryEngineVersion.V6))));
+			}
+            else
+            {
+				XbimServices.Current.ConfigureServices(services => services
+				.AddXbimToolkit(opt => opt
+					.AddLoggerFactory(_loggerFactory)
+					// .AddHeuristicModel()
+					.AddGeometryServices(builder => builder.Configure(c => c.GeometryEngineVersion = XGeometryEngineVersion.V6))));
+			}            
             _logger = _loggerFactory.CreateLogger<BatchProcessor>();
         }
 
@@ -77,6 +88,7 @@ namespace XbimRegression
             writer.WriteLine(ProcessResult.CsvHeader);
 
             // ParallelOptions opts = new ParallelOptions() { MaxDegreeOfParallelism = 12 };
+
 
             // Parallel.ForEach<FileInfo>(toProcess, opts, file =>
             foreach (var file in Params.FilesToProcess)
@@ -363,6 +375,8 @@ namespace XbimRegression
                 return null;
             }
             // create a callback for progress
+
+
 
             switch (Path.GetExtension(ifcFileName).ToLowerInvariant())
             {

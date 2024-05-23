@@ -249,17 +249,18 @@ namespace Xbim.ModelGeometry.Scene
                 return null;
             }
 
-            /// <summary>
-            /// Initialise the <see cref="XbimCreateContextHelper"/>
-            /// </summary>
-            /// <param name="adjustWcs"></param>
-            /// <param name="generateFullGeometry"><c>true</c> if full BREPS required, <c>false</c> just to Tesselate</param>
-            /// <returns></returns>
-            internal bool Initialise(bool adjustWcs, bool generateFullGeometry = false)
+			/// <summary>
+			/// Initialise the <see cref="XbimCreateContextHelper"/>
+			/// </summary>
+			/// <param name="adjustWcs"></param>
+			/// <param name="engine">A geometry engine is required to compute some of the most complex placements</param>
+			/// <param name="generateFullGeometry"><c>true</c> if full BREPS required, <c>false</c> just to Tesselate</param>
+			/// <returns></returns>
+			internal bool Initialise(bool adjustWcs, IXbimGeometryEngine engine, bool generateFullGeometry = false)
             {
                 try
                 {
-                    PlacementTree = new XbimPlacementTree(Model, adjustWcs, _modelContext._logger);
+                    PlacementTree = new XbimPlacementTree(Model, adjustWcs, _modelContext._logger, engine);
                     GeometryShapeLookup = new ConcurrentDictionary<int, int>();
                     MapGeometryReferences = new ConcurrentDictionary<int, List<GeometryReference>>();
                     MapTransforms = new ConcurrentDictionary<int, XbimMatrix3D>();
@@ -717,6 +718,10 @@ namespace Xbim.ModelGeometry.Scene
                 return;
             foreach (var context in contexts)
             {
+                if (context is IIfcGeometricRepresentationSubContext subc)
+                    logger?.LogDebug("Added context #{contextLabel}={type} {identifier}, {contextType}, {targetView}", context.EntityLabel, context.ExpressType.Name, context.ContextIdentifier, context.ContextType, subc.TargetView);
+                else
+                    logger?.LogDebug("Added context #{contextLabel}={type} {identifier}, {contextType}", context.EntityLabel, context.ExpressType.Name, context.ContextIdentifier, context.ContextType);
                 _contexts.Add(context);
             }
         }
@@ -790,7 +795,7 @@ namespace Xbim.ModelGeometry.Scene
                     progDelegate?.Invoke(-1, "Initialise");
                     // Creation of full BREP representation is an optional V6 only feature
                     var createFullGeometry = engineVersion == XGeometryEngineVersion.V6 && generateBREPs == true;
-                    if (!contextHelper.Initialise(adjustWcs, createFullGeometry))
+                    if (!contextHelper.Initialise(adjustWcs, Engine, createFullGeometry))
                         throw new Exception("Failed to initialise geometric context, " + contextHelper.InitialiseError);
                     progDelegate?.Invoke(101, "Initialise");
 
@@ -804,18 +809,20 @@ namespace Xbim.ModelGeometry.Scene
 
                     // process features
                     var processed = WriteProductsWithFeatures(contextHelper, progDelegate, geomStorageType, geometryTransaction);
+					_logger?.LogInformation("Product shapes with features processed: {processed} (tally is {tally}).", processed.Count, contextHelper.Tally);
 
-                    progDelegate?.Invoke(-1, "WriteProductShapes");
+					progDelegate?.Invoke(-1, "WriteProductShapes");
                     var productsRemaining = _model.Instances.OfType<IIfcProduct>()
                         .Where(p =>
                             p.Representation != null
                             && !processed.Contains(p.EntityLabel)
                         ).ToList();
 
-
+                    _logger?.LogInformation("Product shapes outstanding: {productsRemaining}", productsRemaining.Count);
                     WriteProductShapes(contextHelper, productsRemaining, geometryTransaction);
                     progDelegate?.Invoke(101, "WriteProductShapes");
                     //Write out the actual representation item reference count
+					_logger?.LogInformation("Product processed tally: {tally}).", contextHelper.Tally);
 
 
                     //Write out the regions of the model
@@ -1175,7 +1182,8 @@ namespace Xbim.ModelGeometry.Scene
                 // Write product representations of context
                 if (product.Representation.Representations.Any(r => IsInContext(_contexts, r) && r.IsBodyRepresentation()))
                 {
-                    WriteProductShape(contextHelper, product, true, txn);
+                    localTally++;
+					WriteProductShape(contextHelper, product, true, txn);
                 }
             }
             );
@@ -1382,6 +1390,7 @@ namespace Xbim.ModelGeometry.Scene
                 contextHelper.MapTransforms.TryAdd(map.EntityLabel,
                     XbimMatrix3D.Multiply(targetTransform, sourceTransform));
             });
+            _logger?.LogInformation("Added {tally} maps in WriteMappedItems", contextHelper.MappedShapeIds.Count);
             progDelegate?.Invoke(101, "WriteMappedItems, (" + contextHelper.MappedShapeIds.Count + " written)");
         }
 
@@ -1627,6 +1636,7 @@ namespace Xbim.ModelGeometry.Scene
             contextHelper.PercentageParsed = localPercentageParsed;
             contextHelper.Tally = localTally;
             Debug.Assert(contextHelper.ProductShapeIds.Count == processed.Count);
+            _logger?.LogInformation("Processed {tally} shapes in WriteShapeGeometries", localTally);
             progDelegate?.Invoke(101, "WriteShapeGeometries, (" + localTally + " written)");
         }
 

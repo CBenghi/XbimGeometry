@@ -29,8 +29,6 @@ namespace Xbim
 		{
 		}
 
-		
-
 		// Converts an ObjectPlacement into a TopLoc_Location
 		TopLoc_Location XbimConvert::ToLocation(IIfcObjectPlacement^ objPlacement, ILogger^ logger, Xbim::Geometry::Services::ModelGeometryService^ modelServices)
 		{
@@ -39,12 +37,12 @@ namespace Xbim
 
 		gp_Trsf XbimConvert::ToTransform(IIfcObjectPlacement^ objPlacement, ILogger^ logger, Xbim::Geometry::Services::ModelGeometryService^ modelServices)
 		{
-
 			IIfcLocalPlacement^ localPlacement = dynamic_cast<IIfcLocalPlacement^>(objPlacement);
 			IIfcGridPlacement^ gridPlacement = dynamic_cast<IIfcGridPlacement^>(objPlacement);
+			IIfcLinearPlacement^ linearPlacement = dynamic_cast<IIfcLinearPlacement^>(objPlacement);
 			gp_Trsf trsf;
 
-			while (localPlacement != nullptr || gridPlacement != nullptr)
+			while (localPlacement != nullptr || gridPlacement != nullptr || linearPlacement != nullptr)
 			{
 				if (localPlacement != nullptr)
 				{
@@ -130,10 +128,16 @@ namespace Xbim
 					localPlacement = nullptr;
 					gridPlacement = nullptr;
 				}
+				else if (linearPlacement != nullptr)//gridplacement;
+				{
+					LoggerExtensions::LogError(logger, "Object placement #{placementLabel}={type} not implemented, objects might be misplaced.", objPlacement->EntityLabel, objPlacement->GetType()->Name);
+					linearPlacement = nullptr;
+				}
 				else
 				{
 					localPlacement = nullptr;
 					gridPlacement = nullptr;
+					linearPlacement = nullptr;
 				}
 			}
 			return trsf;
@@ -447,10 +451,12 @@ namespace Xbim
 			const gp_Trsf& trsf = location.Transformation();
 			gp_Mat m = trsf.VectorialPart();
 			gp_XYZ t = trsf.TranslationPart();
-			return XbimMatrix3D((double)m.Row(1).X(), (double)m.Row(1).Y(), (double)m.Row(1).Z(), 0.0,
+			return XbimMatrix3D(
+				(double)m.Row(1).X(), (double)m.Row(1).Y(), (double)m.Row(1).Z(), 0.0,
 				(double)m.Row(2).X(), (double)m.Row(2).Y(), (double)m.Row(2).Z(), 0.0,
 				(double)m.Row(3).X(), (double)m.Row(3).Y(), (double)m.Row(3).Z(), 0.0,
-				(double)t.X(), (double)t.Y(), (double)t.Z(), 1.0);
+				(double)t.X(), (double)t.Y(), (double)t.Z(), 1.0
+			);
 		}
 
 		gp_Trsf XbimConvert::ToTransform(IIfcCartesianTransformationOperator2D^ ct)
@@ -640,10 +646,18 @@ namespace Xbim
 				return XbimMatrix3D::Multiply(localTrans, gridTransform);
 
 			}
-			else return XbimMatrix3D::Identity;
+			else if (dynamic_cast<IIfcLinearPlacement^>(objPlacement)) // a linear placement
+			{
+				LoggerExtensions::LogError(logger, "Object placement #{placementLabel}={type} not implemented, objects might be misplaced.", objPlacement->EntityLabel, objPlacement->GetType()->Name);
+				IIfcLinearPlacement^ linPlacement = (IIfcLinearPlacement^)objPlacement;
+				//return XbimMatrix3D::Identity;
+			}
+			else
+			{
+				LoggerExtensions::LogError(logger, "Object placement #{placementLabel}={type} not implemented, objects might be misplaced.", objPlacement->EntityLabel, objPlacement->GetType()->Name);
+			}
+			return XbimMatrix3D::Identity;
 		}
-
-
 
 		XbimMatrix3D XbimConvert::ToMatrix3D(IIfcAxis2Placement3D^ axis3)
 		{
@@ -663,7 +677,6 @@ namespace Xbim
 				return  XbimMatrix3D(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, axis3->Location->X, axis3->Location->Y,
 				axis3->Location->Z, 1);
 		}
-
 
 		bool XbimConvert::IsEqual(IIfcCartesianPoint^ ptA, IIfcCartesianPoint^ ptB, double tolerance)
 		{
