@@ -14,9 +14,9 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
 		<PackageReference Include="NReco.Logging.File" Version="1.1.6" />
-    <PackageReference Include="Xbim.Essentials" Version="6.0.450-develop" />
-    <PackageReference Include="Xbim.IO.Esent" Version="6.0.450-develop" />
-    <PackageReference Include="Xbim.Geometry.Abstractions" Version="6.2.345-develop" />
+		<PackageReference Include="Xbim.Essentials" Version="6.0.462-develop" />
+    <PackageReference Include="Xbim.IO.Esent" Version="6.0.462-develop" />
+    <PackageReference Include="Xbim.Geometry.Abstractions" Version="6.2.347-develop" />
   </ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj">

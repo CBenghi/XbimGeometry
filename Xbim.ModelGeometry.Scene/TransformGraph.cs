@@ -27,9 +27,7 @@ namespace Xbim.ModelGeometry.Scene
     {
         private readonly TransformNode _root;
         private Dictionary<long, TransformNode> _productNodes = new Dictionary<long, TransformNode>(); 
-        private readonly Dictionary<IIfcObjectPlacement, TransformNode> _placementNodes =
-            new Dictionary<IIfcObjectPlacement, TransformNode>();
-
+        private readonly Dictionary<IIfcObjectPlacement, TransformNode> _placementNodes = new Dictionary<IIfcObjectPlacement, TransformNode>();
 
         [NonSerialized]
         private readonly IModel _model;

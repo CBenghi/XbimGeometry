@@ -172,9 +172,12 @@ namespace Xbim.ModelGeometry.Scene
 					logger?.LogError("XbimPlacementNode for entity #{label} of type {type} needs a non null engine parameter. An identity matrix was used instead, related objects might result misplaced.", placement.EntityLabel, placement.GetType().Name);
 					Matrix = XbimMatrix3D.Identity;
 				}
-				else if (placement is IIfcLinearPlacement interfaceLinearPlacement)
+				else if (placement is Ifc4x3.GeometricConstraintResource.IfcLinearPlacement interfaceLinearPlacement)
                 {
-                    Matrix = engine.ToMatrix3D(interfaceLinearPlacement, logger);
+                    if (LinearPlacement.LinearPlacement.TryGetPlacement(interfaceLinearPlacement, out var t, logger))
+                        Matrix = t;
+                    else
+                        Matrix = XbimMatrix3D.Identity;
                 }
                 else if (placement is IIfcGridPlacement interfaceGridPlacement)
 				{

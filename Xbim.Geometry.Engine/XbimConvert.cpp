@@ -1,4 +1,3 @@
-
 #include <gp_Dir2d.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Dir2d.hxx>
@@ -16,11 +15,11 @@
 #include "XbimCurve.h"
 #include "XbimCurve2d.h"
 
-
 using namespace System::Linq;
 using namespace Xbim::Common::Geometry;
 using namespace Xbim::Ifc4::Interfaces;
 using namespace Xbim::Geometry::Abstractions;
+
 namespace Xbim
 {
 	namespace Geometry
@@ -128,10 +127,10 @@ namespace Xbim
 					localPlacement = nullptr;
 					gridPlacement = nullptr;
 				}
-				else if (linearPlacement != nullptr)//gridplacement;
+				else if (linearPlacement != nullptr) //linear placement;
 				{
-					LoggerExtensions::LogError(logger, "Object placement #{placementLabel}={type} not implemented, objects might be misplaced.", objPlacement->EntityLabel, objPlacement->GetType()->Name);
-					linearPlacement = nullptr;
+					 LoggerExtensions::LogError(logger, "Object placement #{placementLabel}={type} not implemented, objects might be misplaced.", objPlacement->EntityLabel, objPlacement->GetType()->Name);
+					 linearPlacement = nullptr;
 				}
 				else
 				{
@@ -585,7 +584,7 @@ namespace Xbim
 				}
 				else //must be 2D
 				{
-					throw(gcnew System::NotImplementedException("Support for Placements other than 3D not implemented"));
+					throw(gcnew System::NotImplementedException("XbimConvert: Support for Placements other than 3D not implemented"));
 				}
 
 			}
@@ -648,13 +647,13 @@ namespace Xbim
 			}
 			else if (dynamic_cast<IIfcLinearPlacement^>(objPlacement)) // a linear placement
 			{
-				LoggerExtensions::LogError(logger, "Object placement #{placementLabel}={type} not implemented, objects might be misplaced.", objPlacement->EntityLabel, objPlacement->GetType()->Name);
+				LoggerExtensions::LogError(logger, "XbimConvert: Object placement #{placementLabel}={type} not implemented, objects might be misplaced.", objPlacement->EntityLabel, objPlacement->GetType()->Name);
 				IIfcLinearPlacement^ linPlacement = (IIfcLinearPlacement^)objPlacement;
 				//return XbimMatrix3D::Identity;
 			}
 			else
 			{
-				LoggerExtensions::LogError(logger, "Object placement #{placementLabel}={type} not implemented, objects might be misplaced.", objPlacement->EntityLabel, objPlacement->GetType()->Name);
+				LoggerExtensions::LogError(logger, "XbimConvert: Object placement #{placementLabel}={type} not implemented, objects might be misplaced.", objPlacement->EntityLabel, objPlacement->GetType()->Name);
 			}
 			return XbimMatrix3D::Identity;
 		}

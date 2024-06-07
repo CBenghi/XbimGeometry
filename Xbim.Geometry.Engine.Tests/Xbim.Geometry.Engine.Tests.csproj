@@ -12,6 +12,8 @@
 	<PropertyGroup>
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
 	  <NoWarn>CS8602;CS8604</NoWarn>
+	  <SignAssembly>True</SignAssembly>
+	  <AssemblyOriginatorKeyFile>..\XbimOpenSourceKeyFile.snk</AssemblyOriginatorKeyFile>
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="FluentAssertions" Version="6.10.0" />
@@ -19,7 +21,8 @@
 		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
 		<PackageReference Include="Moq" Version="4.18.4" />
 		<PackageReference Include="xunit" Version="2.6.2" />
-		<PackageReference Include="xunit.abstractions" Version="2.0.3" />
+    <PackageReference Include="MartinCostello.Logging.XUnit" Version="0.3.0" />
+    <PackageReference Include="xunit.abstractions" Version="2.0.3" />
 		<PackageReference Include="Xunit.DependencyInjection.Logging" Version="8.0.1" />
 		<PackageReference Include="xunit.runner.visualstudio" Version="2.5.4">
 			<PrivateAssets>all</PrivateAssets>
@@ -125,6 +128,12 @@
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="TestFiles\Github\Github_issue_473_minimal.ifc">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="TestFiles\Ifc4x3Models\Armamento.ifc">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="TestFiles\Ifc4x3Models\LinearPlacementOfSignal.ifc">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="TestFiles\IfcExamples\beam-standard-case.ifc">
@@ -519,5 +528,10 @@
 			<Visible>true</Visible>
 		</Content>
 		<!-- TODO: ARM-->
+	</ItemGroup>
+
+	
+	<ItemGroup>
+	  <Folder Include="TestFiles\Ifc4x3Models\" />
 	</ItemGroup>
 </Project>

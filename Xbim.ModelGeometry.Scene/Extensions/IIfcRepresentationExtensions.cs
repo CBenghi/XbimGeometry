@@ -53,7 +53,7 @@ namespace Xbim.ModelGeometry.Scene.Extensions
                             return false;
                     }
                 case "axis": 
-                    return true; // we separate the explicily excluded identifiers for debug purposes
+                    return false; // we separate the explicily excluded identifiers for debug purposes
                 case "footprint":
                     return false; // we separate the explicily excluded identifiers for debug purposes
 				default:
