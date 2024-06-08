@@ -26,5 +26,7 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
 	</ItemGroup>
-
+  <ItemGroup>
+    <ProjectCapability Remove="TestContainer" />
+  </ItemGroup>
 </Project>

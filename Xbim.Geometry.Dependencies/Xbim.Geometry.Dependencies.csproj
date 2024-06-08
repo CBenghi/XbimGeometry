@@ -38,5 +38,7 @@
 		<Message Importance="high" Text="Building x64 Platform: $(Platform)" />
 		<MSBuild Projects="$(MSBuildProjectFile)" Properties="Platform = AnyCPU;PlatformTarget=x64;Configuration=$(Configuration);RunTimeIdentifier=win10-x64" RunEachTargetSeparately="true" />
 	</Target>
-
+  <ItemGroup>
+    <ProjectCapability Remove="TestContainer" />
+  </ItemGroup>
 </Project>

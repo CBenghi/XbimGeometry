@@ -24,6 +24,9 @@
 		</ProjectReference>
 		<ProjectReference Include="..\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj" />
 	</ItemGroup>
+  <ItemGroup>
+    <ProjectCapability Remove="TestContainer" />
+  </ItemGroup>
   <!--<Target Name="PostBuild" AfterTargets="PostBuildEvent">
 		<ItemGroup>
 			<Item Name="Occ86Dlls" Include="$(GeometryInteropDirectory)/win10-x86/*.*" />

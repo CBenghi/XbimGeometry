@@ -123,5 +123,8 @@
   <ItemGroup>
 		<PackageReference Include="Xbim.Geometry.Abstractions" Version="6.2.347-develop" />
 	</ItemGroup>
+  <ItemGroup>
+    <ProjectCapability Remove="TestContainer" />
+  </ItemGroup>
 
 </Project>
