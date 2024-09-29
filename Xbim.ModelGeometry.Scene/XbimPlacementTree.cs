@@ -2,8 +2,10 @@
 using Microsoft.Isam.Esent.Interop;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Text;
 using Xbim.Common;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Engine.Interop;
@@ -80,7 +82,10 @@ namespace Xbim.ModelGeometry.Scene
             // populate the nodes
             Nodes = new Dictionary<int, XbimPlacementNode>();
             foreach (var placement in objectPlacements)
-                Nodes.Add(placement.EntityLabel, new XbimPlacementNode(placement, logger, engine));
+            {
+                var tmp = new XbimPlacementNode(placement, logger, engine);
+                Nodes.Add(placement.EntityLabel, tmp);
+            }
 
             // traverse the nodes to complete their initialization, they are either root or not
             foreach (var objPlacement in objectPlacements)
@@ -149,9 +154,65 @@ namespace Xbim.ModelGeometry.Scene
             get { return Nodes[placementLabel].Matrix; }
         }
 
+        [DebuggerDisplay("{ShortDescription}")]
         public class XbimPlacementNode
         {
-            private List<XbimPlacementNode>? _children;
+            public string ShortDescription
+            {
+                get
+                {
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append(Matrix.IsIdentity ? "Id" : Summarize(Matrix));
+                    sb.Append($" #Children: {Children.Count}");
+                    return sb.ToString();
+                }
+            }
+
+			public static string Summarize(XbimMatrix3D matrix)
+			{
+
+                if (TryGetZRot(matrix, out double angleRadians))
+                    return $"Rotation: {angleRadians * 180 / Math.PI:#.##}° X: {matrix.OffsetX:#.##}, Y: {matrix.OffsetY:#.##}, Z: {matrix.OffsetZ:#.##}";
+                return $"Complex, X: {matrix.OffsetX:#.##}, Y: {matrix.OffsetY:#.##}, Z: {matrix.OffsetZ:#.##}";
+			}
+
+			private static bool TryGetZRot(XbimMatrix3D matrix, out double angleRadians)
+			{
+                angleRadians = 0 ;
+				if (IsNotClose(matrix.M33, 1) || IsNotClose(matrix.M44, 1))
+                    return false;
+                if (IsNotClose(matrix.M31, 0) || IsNotClose(matrix.M32, 0) || IsNotClose(matrix.M13, 0) || IsNotClose(matrix.M23, 0))
+                    return false;
+				if (IsNotClose(matrix.M14 , 0) || IsNotClose(matrix.M24, 0) || IsNotClose(matrix.M34, 0))
+					return false;
+                if (IsNotClose(matrix.M11, matrix.M22))
+                    return false;
+
+				/*
+                
+                M11 = Math.Cos(theta),
+				M21 = -Math.Sin(theta),
+				M12 = Math.Sin(theta),
+				M22 = Math.Cos(theta)
+                 
+                 */
+				var ang = Math.Atan2(matrix.M12, matrix.M11);
+				if (IsNotClose(matrix.M11, Math.Cos(ang)))
+					return false;
+				if (IsNotClose(matrix.M21, -Math.Sin(ang)))
+                    return false;
+                if (IsNotClose(matrix.M12, Math.Sin(ang)))
+                    return false;
+                angleRadians = ang;
+                return true;
+			}
+
+			private static bool IsNotClose(double m33, double v)
+			{
+                return Math.Abs(m33 - v) > 1.0e-10;
+			}
+
+			private List<XbimPlacementNode>? _children;
             private bool _isAdjustedToGlobal;
 
             /// <summary>

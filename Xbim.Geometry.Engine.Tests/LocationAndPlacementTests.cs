@@ -3,8 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Isam.Esent.Interop;
+using Microsoft.Isam.Esent.Interop.Windows8;
 using Newtonsoft.Json;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Transactions;
@@ -18,6 +20,7 @@ using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
 using Xbim.ModelGeometry.Scene;
+using Xbim.ModelGeometry.Scene.LinearPlacement;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -85,6 +88,53 @@ namespace Xbim.Geometry.Engine.Tests
 					point = tr.Vertices.FirstOrDefault();
 					point.X.Should().BeGreaterThan(300000);
 					point.Y.Should().BeGreaterThan(6200000);
+				}
+			}
+		}
+
+		[Fact]
+		public void LinearPlacementMatrixTest()
+		{
+			using var m = IfcStore.Open("TestFiles\\Ifc4x3Models\\Armamento.ifc");
+			_logger.LogInformation("Starting");
+			var fnd = LinearPlacementCurve.TryGetCurve(m.Instances[11114] as Ifc4x3.GeometryResource.IfcGradientCurve, out var lp, _logger);
+			fnd.Should().BeTrue();
+			lp.Should().NotBeNull();
+			if (lp is LinearPlacementGradientCurve pc)
+			{
+				var along = 0.0;
+				var distances = pc.GetBaseLenghts().ToList();
+				XbimPoint3D OriginP = new XbimPoint3D(0, 0, 0);
+				for (int i = 0; i < distances.Count - 1; i++)
+				{
+					// we get the start point of the segment
+					var t = pc.GetSegmentTransform(i, _logger, out var tp);
+					var tempP = OriginP * t;
+					Debug.WriteLine($"{tempP.X},{tempP.Y}");
+
+					if (tp == "ShapeClothoid")
+					{
+						// midpoint
+						double l = 1;
+						while (l < distances[i])
+						{
+							// var midP = along + (distances[i] / 2);
+							t = lp.GetTransform(along + l, _logger);
+							tempP = OriginP * t;
+							Debug.WriteLine($"{tempP.X},{tempP.Y}");
+							l += 1.0;
+						}
+					}
+					// Debug.WriteLine($"Dist: {along}, Matrix: {XbimPlacementTree.XbimPlacementNode.Summarize(t)}, type: {tp}");					
+					along += distances[i];
+				}
+			}
+			else
+			{
+				for (double d = 0; d < 1000; d += 10)
+				{
+					var t = lp.GetTransform(d, _logger);
+					Debug.WriteLine($"Dist: {d} Matrix: {XbimPlacementTree.XbimPlacementNode.Summarize(t)}");
 				}
 			}
 		}
@@ -274,7 +324,7 @@ namespace Xbim.Geometry.Engine.Tests
 		}
 
 		[Fact]
-		private void LinearPlacementTest()
+		public void LinearPlacementTest()
 		{
 			using var m = new MemoryModel(new Xbim.Ifc4x3.EntityFactoryIfc4x3Add2());
 			using var txn = m.BeginTransaction("Test");
@@ -291,7 +341,7 @@ namespace Xbim.Geometry.Engine.Tests
 			var rt = IfcModelBuilder4x3.MakePointGradientCurve(m);
 			relP.Location = IfcModelBuilder4x3.MakePointDistanceExpression(m, 20);
 		}
-		
+
 		[Theory]
 		[InlineData("TestFiles\\Ifc4x3Models\\LinearPlacementOfSignal.ifc", 3021)]
 		[InlineData("TestFiles\\Ifc4x3Models\\Armamento.ifc", -1)]
