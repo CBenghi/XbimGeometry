@@ -21,6 +21,14 @@ namespace XbimRegression
         public List<int> WriteBreps = null;
         public bool GeometryV1; 
 
+        private bool ExtensionMatches(string extension)
+        {
+			if (extension == null)
+				return false;
+			var ext = extension.ToLowerInvariant();
+			return ext == ".ifc" || ext == ".ifcxml" || ext == ".ifczip";
+		}
+
         public Params(string[] args)
         {
             if (args.Length < 1)
@@ -37,13 +45,13 @@ namespace XbimRegression
             if (Directory.Exists(TestFileRoot))
             {
                 var di = new DirectoryInfo(TestFileRoot);
-                FilesToProcess = di.GetFiles("*.IFC", SearchOption.AllDirectories).Where(y=>y.Extension.ToLowerInvariant() == ".ifc");
+                FilesToProcess = di.GetFiles("*.IFC*", SearchOption.AllDirectories).Where(y=> ExtensionMatches(y.Extension));
                 ResultsFile = Path.Combine(TestFileRoot, string.Format("XbimRegression_{0:yyyyMMdd-hhmmss}.csv", DateTime.Now));
             }
             else if (File.Exists(TestFileRoot))
             {
                 var ext = Path.GetExtension(TestFileRoot).ToLowerInvariant();
-                if (ext == ".ifc")
+                if (ExtensionMatches( ext ))
                 {
                     FilesToProcess = new[] { new FileInfo(TestFileRoot) };
                     ResultsFile = Path.ChangeExtension(TestFileRoot, "regression.csv");

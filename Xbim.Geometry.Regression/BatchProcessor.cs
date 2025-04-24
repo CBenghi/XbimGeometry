@@ -36,7 +36,7 @@ namespace XbimRegression
                 {
                     fileLoggerOpts.FormatLogFileName = fName =>
                     {
-                        return String.Format(fName, _currentLogFileName);
+                        return string.Format(fName, _currentLogFileName);
                     };
                     fileLoggerOpts.FormatLogEntry = (msg) =>
                     {
@@ -53,7 +53,9 @@ namespace XbimRegression
                         return sb.ToString();
                     };
                     fileLoggerOpts.MinLevel = LogLevel.Trace;
-                }));
+                }))
+                .AddFile("totLogger.log")
+				;
             // Configure xbim services / logging & geometry
             
 			if (Params.Caching)
@@ -68,7 +70,6 @@ namespace XbimRegression
 					.AddLoggerFactory(_loggerFactory)
 					// .AddHeuristicModel()
 					.AddGeometryServices(builder => builder.Configure(c => c.GeometryEngineVersion = XGeometryEngineVersion.V6))));
-
 
 			_logger = _loggerFactory.CreateLogger<BatchProcessor>();
         }
@@ -91,17 +92,15 @@ namespace XbimRegression
             // Parallel.ForEach<FileInfo>(toProcess, opts, file =>
             foreach (var file in Params.FilesToProcess)
             {
-                
                 //set up a  log file for this file run                 
                 _currentLogFileName = Path.ChangeExtension(file.FullName, "log");
                 var runLogFileName = _currentLogFileName;
                 if (File.Exists(_currentLogFileName)) File.Delete(runLogFileName); //clear previous run Log file 
-                Console.WriteLine($"Processing {file}");
+				_logger.LogInformation($"Processing {file}");
                 ProcessResult result = ProcessFile(file.FullName, writer, Params.AdjustWcs, _loggerFactory);
-                
                 _logger.LogInformation($"Processed {file.FullName}");
                 _currentLogFileName = "BatchProcessor.log";
-                _logger.LogInformation($"Processing {file.FullName}");
+                _logger.LogInformation($"Evaluating log result for {file.FullName}");
                 Console.WriteLine($"Processing run results from log file {runLogFileName}");
                
                 var txt = File.ReadAllText(runLogFileName);

@@ -186,8 +186,8 @@ namespace Xbim.ModelGeometry.Scene
             internal ConcurrentDictionary<int, GeometryReference> ShapeLookup;
             private bool _disposed;
             private readonly Xbim3DModelContext _modelContext;
-
-            public XbimCreateContextHelper(Xbim3DModelContext modelContext, IModel model, IfcRepresentationContextCollection contexts)
+            
+			public XbimCreateContextHelper(Xbim3DModelContext modelContext, IModel model, IfcRepresentationContextCollection contexts)
             {
                 _modelContext = modelContext;
                 Model = model;
@@ -317,11 +317,18 @@ namespace Xbim.ModelGeometry.Scene
                 var compoundElementsDictionary = XbimMultiValueDictionary<IIfcObjectDefinition, IIfcObjectDefinition>.Create<HashSet<IIfcObjectDefinition>>();
                 foreach (var aggRel in Model.Instances.OfType<IIfcRelAggregates>())
                 {
-                    foreach (var relObj in aggRel.RelatedObjects)
+					if (aggRel.RelatingObject is null)
+					{
+						_modelContext.LogWarning(aggRel,
+						   "Invalid null value for RelatingObject"
+						   );
+                        continue;
+					}
+					foreach (var relObj in aggRel.RelatedObjects)
                     {
+                        
                         compoundElementsDictionary.Add(aggRel.RelatingObject, relObj);
                     }
-
                 }
 
                 // openings
@@ -415,9 +422,32 @@ namespace Xbim.ModelGeometry.Scene
                 FeatureElementShapeIds = new HashSet<int>();
                 ProductShapeIds = new HashSet<int>();
 
-                foreach (var product in Model.Instances.OfType<IIfcProduct>(true).Where(p => p.Representation != null))
+                List<IIfcProduct> products = new List<IIfcProduct>();
+                try
                 {
+                    foreach (var item in Model.Instances.OfType<IIfcProduct>())
+                    {
+                        try
+                        {
+                            var t = item.Representation;
+                            if (item != null)
+                            {
+                                products.Add(item);
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            _modelContext.LogWarning(item, "Exception thrown getting representation for product.");
+                        }
+                    }
+                }
+                catch (Exception productOpeningException)
+                {
+					_modelContext.LogError("Exception thrown products.", productOpeningException);
+				}
 
+				foreach (var product in products)
+                {
                     if (CustomMeshBehaviour != null)
                     {
                         double v1 = 0, v2 = 0; // v1 and v2 are ignored in this case

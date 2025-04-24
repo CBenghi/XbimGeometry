@@ -33,7 +33,6 @@
 #include <Geom2dAPI_PointsToBSpline.hxx>
 #include <ShapeExtend_ComplexCurve.hxx>
 
-
 /*
 The approach of the curve factory is to build all curves as IXCurve using the build method.
 This will ensure correct dimensionality of the curves is maintained
@@ -82,7 +81,6 @@ namespace Xbim
 					return BuildXCurve(hCurve, curveType);
 				}
 			}
-
 
 			IXCurve^ CurveFactory::BuildDirectrix(IIfcCurve^ curve, Nullable<double> startParam, Nullable<double> endParam)
 			{
@@ -418,12 +416,14 @@ namespace Xbim
 
 			Handle(Geom_GradientCurve) CurveFactory::BuildCurve(Ifc4x3::GeometryResource::IfcGradientCurve^ ifcGradientCurve)
 			{
-
 				std::optional<Handle(Standard_Transient)> cached = GetCache()->Get(ifcGradientCurve->EntityLabel);
 				if (cached.has_value()) {
 					return Handle(Geom_GradientCurve)::DownCast(cached.value())->Clone();
 				}
-
+				if (attemptedEntityLabels->Contains(ifcGradientCurve->EntityLabel)) {
+					throw RaiseGeometryFactoryException("IfcGradientCurve has already been attempted for #{label}", ifcGradientCurve);
+				}
+				attemptedEntityLabels->Add(ifcGradientCurve->EntityLabel);
 
 				// The base curve is the horizontal projection
 				XCurveType curveType;
@@ -449,7 +449,6 @@ namespace Xbim
 				if (ifcGradientCurve->EndPoint != nullptr)
 				{
 					IIfcAxis2Placement2D^ axis2Placement = dynamic_cast<IIfcAxis2Placement2D^>(ifcGradientCurve->EndPoint);
-
 
 					TopLoc_Location location;
 					if (axis2Placement) {
@@ -919,9 +918,17 @@ namespace Xbim
 					}
 					else if (curveSegment != nullptr)
 					{
-						//TODO: build segment 3d
-						//segments.Append(seg);
-
+						/* we need a Geom_BoundedCurve, but BuildCurveSegment2d returns Geom2d_Curve */
+						Handle(Geom2d_Curve) cSegment = BuildCurveSegment2d(curveSegment);
+						if (cSegment.IsNull())
+							throw RaiseGeometryFactoryException("Curve segment is incorrectly defined", segment);
+						Handle(Geom_Curve) cSegment3d = GeomAPI::To3d(cSegment, gp_Pln(gp::XOY()));
+						if (cSegment3d.IsNull())
+							throw RaiseGeometryFactoryException("Curve segment is incorrectly defined in 3D", segment);
+						Handle(Geom_BoundedCurve) cSegment3dbounded = Handle(Geom_BoundedCurve)::DownCast(cSegment3d);
+						if (cSegment3dbounded.IsNull())
+							throw RaiseGeometryFactoryException("IfcCurveSegment must be bounded curves", segment);
+						segments.Append(cSegment3dbounded);
 					}
 				}
 
@@ -1614,7 +1621,6 @@ namespace Xbim
 						segments.Append(boundedCurve);
 					}
 				}
-				 
 			}
 
 			Handle(Geom2d_BSplineCurve) CurveFactory::BuildCurve2d(IIfcCompositeCurveOnSurface^ ifcCompositeCurve)

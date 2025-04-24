@@ -403,9 +403,6 @@ Handle(Geom2d_OffsetCurve) NCurveFactory::BuildOffsetCurve2d(const Handle(Geom2d
 	}
 }
 
-
-
-
 Handle(Geom_LineWithMagnitude) NCurveFactory::BuildLine3d(const gp_Pnt& pnt, const gp_Vec& dir, double magnitude)
 {
 	try
@@ -444,6 +441,7 @@ Handle(Geom_Circle) NCurveFactory::BuildCircle3d(const gp_Ax2& axis, double radi
 		return Handle(Geom_Circle)(); //return null handle for checking
 	}
 }
+
 Handle(Geom_Circle) NCurveFactory::BuildCircle3d(const gp_Pnt& start, const gp_Pnt& mid, const gp_Pnt& end)
 {
 	try
@@ -489,7 +487,6 @@ Handle(Geom2d_EllipseWithSemiAxes) NCurveFactory::BuildEllipse2d(const gp_Ax22d&
 	}
 	return Handle(Geom2d_EllipseWithSemiAxes)(); //return null handle for checking
 }
-
 
 Handle(Geom_TrimmedCurve) NCurveFactory::BuildTrimmedCurve3d(const Handle(Geom_Curve)& basisCurve, double u1, double u2, bool sense)
 {
