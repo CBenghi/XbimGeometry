@@ -2,6 +2,7 @@
 using Serilog;
 using System.Diagnostics;
 using Xbim.Common.Configuration;
+using Xbim.Common.Enumerations;
 using Xbim.Common.ExpressValidation;
 using Xbim.Geometry.Abstractions;
 using Xbim.Ifc;
@@ -18,6 +19,14 @@ namespace Xbim.Geometry.GeomService
         ExitCodeErrorCopying = 4,
         ExitCodeUndefinedError = 5,
         ExitCodeInvalidIFC = 6,
+        ExitCodeExceptionValidating = 7,
+    }
+
+    public enum ExpressValidation 
+    {
+        None = 0,
+        ValidateOnly = 1,
+        ValidateAndLog = 2
     }
 
     internal class Program
@@ -26,7 +35,7 @@ namespace Xbim.Geometry.GeomService
         {
             if (args.Length == 1 && 
                     (
-                        args[0] == "/help"|| 
+                        args[0] == "/help" ||
                         args[0] == "/?"
                     )
                 )
@@ -35,6 +44,8 @@ namespace Xbim.Geometry.GeomService
             XGeometryEngineVersion engineVer = XGeometryEngineVersion.V6;
             bool singleThread = false;
             bool adjustWcs = false;
+            ExpressValidation validateExpress = ExpressValidation.None;
+            bool skipGeometry = false;
             bool progress = false;
             bool doLog = false;
             bool overwrite = false;
@@ -72,6 +83,16 @@ namespace Xbim.Geometry.GeomService
                         else if (tmp == "V6")
                             engineVer = XGeometryEngineVersion.V6;
                     }
+                    else if (arg.StartsWith("/validate:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var tmp = arg.Substring(10);
+                        if (tmp.Equals("ValidateOnly", StringComparison.OrdinalIgnoreCase))
+                            validateExpress = ExpressValidation.ValidateOnly;
+                        else if (tmp.Equals("ValidateAndLog", StringComparison.OrdinalIgnoreCase))
+                            validateExpress = ExpressValidation.ValidateAndLog;
+                        else if (tmp.Equals("None", StringComparison.OrdinalIgnoreCase))
+                            validateExpress = ExpressValidation.None;
+                    }
                     else if (IsBoolParam(arg, "st", out bool thisParamSt))
                     {
                         singleThread = thisParamSt;
@@ -79,6 +100,10 @@ namespace Xbim.Geometry.GeomService
                     else if (IsBoolParam(arg, "adjust", out bool thisParamAdjust))
                     {
                         adjustWcs = thisParamAdjust;
+                    }
+                    else if (IsBoolParam(arg, "skipgeometry", out bool skipGeomParam))
+                    {
+                        skipGeometry = skipGeomParam;
                     }
                     else if (IsBoolParam(arg, "progress", out bool progressPar))
                     {
@@ -191,6 +216,7 @@ namespace Xbim.Geometry.GeomService
             IfcStore? model = null;
             try
             {
+                Debug.WriteLine($"Opening model ```{ifcfile.FullName}```");
                 model = IfcStore.Open(ifcfile.FullName, null, null, ReportProgress);
             }
             catch (Exception)
@@ -199,16 +225,73 @@ namespace Xbim.Geometry.GeomService
                 // so that the caller can decide what to do (e.g. retry, skip, etc.)
                 return CloseAndReturn(tlog, ExitCodes.ExitCodeInvalidIFC);
             }
-
             using (model)
             {
-                var geomContext = new Xbim3DModelContext(model, loggerFactory, engineVersion: engineVer);
-                tlog?.WriteLine($"context initialised at {sCopy.ElapsedMilliseconds}msec");
-                if (singleThread)
-                    geomContext.MaxThreads = 1;
+                if (validateExpress != ExpressValidation.None)
+                {
+                    try
+                    {
+                        var validator = new Validator()
+                        {
+                            ValidateLevel = ValidationFlags.All,
+                            CreateEntityHierarchy = true
+                        };
 
-                geomContext.CreateContext(ReportProgress, adjustWcs);
-                tlog?.WriteLine($"context created at {sCopy.ElapsedMilliseconds}msec");
+                        List<ValidationResult> validationResult = [];
+                        if (progress)
+                        {
+                            var c = model.Instances.Count();
+                            int i = 0;
+                            var lastReport = -1;
+                            foreach (var item in model.Instances)
+                            {
+                                validationResult.AddRange(validator.Validate(item));
+                                var perc = i * 100 / c;
+                                if (lastReport != perc)
+                                {
+                                    lastReport = perc;
+                                    ReportProgress(perc, "Validating");
+                                }
+                                i++;
+                            }
+                            ReportProgress(100, "Validating");
+                        }
+                        else
+                        {
+                            validationResult = validator.Validate(model).ToList();
+                        }
+
+                        tlog?.WriteLine("Express validation completed with {0} errors.", validationResult.Count);
+                        if (validateExpress == ExpressValidation.ValidateAndLog)
+                        {
+
+                            foreach (var error in validationResult)
+                            {
+                                if (error.Details.Any())
+                                {
+                                    tlog?.WriteLine("Validation error: {0} ({1})", error.Item, string.Join(", ", error.Details.Select(x => x.IssueSource)));
+                                }
+                                else
+                                    tlog?.WriteLine("Validation error: {0} - {1}", error.IssueType, error.Message);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        tlog?.WriteLine("Exception thrown in validation: {0}", ex.Message);
+                        return CloseAndReturn(tlog, ExitCodes.ExitCodeExceptionValidating);
+                    }
+                }
+
+                if (!skipGeometry)
+                {
+                    var geomContext = new Xbim3DModelContext(model, loggerFactory, engineVersion: engineVer);
+                    tlog?.WriteLine($"context initialised at {sCopy.ElapsedMilliseconds}msec");
+                    if (singleThread)
+                        geomContext.MaxThreads = 1;
+                    geomContext.CreateContext(ReportProgress, adjustWcs);
+                    tlog?.WriteLine($"context created at {sCopy.ElapsedMilliseconds}msec");
+                }
                 model.SaveAs(tempFileName, null, ReportProgress);
                 tlog?.WriteLine($"model saved at {sCopy.ElapsedMilliseconds}msec");
                 model.Close();
@@ -254,6 +337,8 @@ namespace Xbim.Geometry.GeomService
                    [/log:true|false]                                    - enable logging 
                    [/overwrite:true|false]                              - overwrite existing xbim file if it exists
                    [/ll:Debug|Information|Warning|Error|Critical|Trace] - Defines the log level
+                   [/validate:None|ValidateOnly|ValidateAndLog]         - express validation of the model (default: None)
+                   [/skipgeometry:true|false]                           - skip geometry generation
                 """
                 );
             return 0;
@@ -288,6 +373,20 @@ namespace Xbim.Geometry.GeomService
             }
         }
 
+        /// <summary>
+        /// Determines whether the specified argument represents a boolean parameter with the given name and parses its
+        /// value if present.
+        /// </summary>
+        /// <remarks>If the argument matches the parameter name but does not specify a value, <paramref
+        /// name="paramSetting"/> is set to <see langword="true"/> by default. Only the values "true" and "false"
+        /// (case-insensitive) are recognized as explicit boolean values.</remarks>
+        /// <param name="argumentToParse">The command-line argument to examine for the boolean parameter. Expected to be in the form
+        /// "/paramName[:true|false]".</param>
+        /// <param name="paramName">The name of the boolean parameter to search for within the argument. Comparison is case-insensitive.</param>
+        /// <param name="paramSetting">When this method returns, contains the parsed boolean value if the parameter is found and valid; otherwise,
+        /// <see langword="false"/>.</param>
+        /// <returns>true if the argument matches the specified parameter name and contains a valid boolean value; otherwise,
+        /// false.</returns>
         private static bool IsBoolParam(string argumentToParse, string paramName, out bool paramSetting)
         {
             if (argumentToParse.StartsWith($"/{paramName}", StringComparison.OrdinalIgnoreCase))

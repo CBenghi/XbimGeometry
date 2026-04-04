@@ -59,7 +59,10 @@
             cmdRequestDump = new Button();
             chkSkipMeshed = new CheckBox();
             groupBox2 = new GroupBox();
+            chkSkipMeshing = new CheckBox();
+            label10 = new Label();
             cmdEnumerateFiles = new Button();
+            cmbValidationLevel = new ComboBox();
             grpProgress.SuspendLayout();
             groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)nudMemoryLimit).BeginInit();
@@ -96,7 +99,7 @@
             cmdConvertGeometry.Name = "cmdConvertGeometry";
             cmdConvertGeometry.Size = new Size(280, 35);
             cmdConvertGeometry.TabIndex = 2;
-            cmdConvertGeometry.Text = "Evaluate Geometry";
+            cmdConvertGeometry.Text = "Evaluate Files";
             cmdConvertGeometry.UseVisualStyleBackColor = true;
             cmdConvertGeometry.Click += cmdConvertGeometry_Click;
             // 
@@ -194,7 +197,7 @@
             // button1
             // 
             button1.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            button1.Location = new Point(636, 433);
+            button1.Location = new Point(636, 379);
             button1.Margin = new Padding(2);
             button1.Name = "button1";
             button1.Size = new Size(140, 25);
@@ -385,7 +388,7 @@
             // button2
             // 
             button2.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            button2.Location = new Point(786, 433);
+            button2.Location = new Point(786, 379);
             button2.Margin = new Padding(2);
             button2.Name = "button2";
             button2.Size = new Size(140, 25);
@@ -421,15 +424,38 @@
             // groupBox2
             // 
             groupBox2.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            groupBox2.Controls.Add(chkSkipMeshing);
+            groupBox2.Controls.Add(label10);
             groupBox2.Controls.Add(cmdEnumerateFiles);
+            groupBox2.Controls.Add(cmbValidationLevel);
             groupBox2.Controls.Add(cmdConvertGeometry);
             groupBox2.Controls.Add(chkSkipMeshed);
-            groupBox2.Location = new Point(636, 463);
+            groupBox2.Location = new Point(636, 409);
             groupBox2.Name = "groupBox2";
-            groupBox2.Size = new Size(290, 92);
+            groupBox2.Size = new Size(290, 146);
             groupBox2.TabIndex = 13;
             groupBox2.TabStop = false;
             groupBox2.Text = "Execute";
+            // 
+            // chkSkipMeshing
+            // 
+            chkSkipMeshing.AutoSize = true;
+            chkSkipMeshing.Location = new Point(6, 121);
+            chkSkipMeshing.Name = "chkSkipMeshing";
+            chkSkipMeshing.Size = new Size(96, 19);
+            chkSkipMeshing.TabIndex = 16;
+            chkSkipMeshing.Text = "skip meshing";
+            chkSkipMeshing.UseVisualStyleBackColor = true;
+            // 
+            // label10
+            // 
+            label10.AutoSize = true;
+            label10.Location = new Point(5, 95);
+            label10.Margin = new Padding(4, 0, 4, 0);
+            label10.Name = "label10";
+            label10.Size = new Size(99, 15);
+            label10.TabIndex = 15;
+            label10.Text = "Model validation:";
             // 
             // cmdEnumerateFiles
             // 
@@ -441,6 +467,17 @@
             cmdEnumerateFiles.Text = "Enumerate files";
             cmdEnumerateFiles.UseVisualStyleBackColor = true;
             cmdEnumerateFiles.Click += cmdEnumerateFiles_Click;
+            // 
+            // cmbValidationLevel
+            // 
+            cmbValidationLevel.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbValidationLevel.FormattingEnabled = true;
+            cmbValidationLevel.Items.AddRange(new object[] { "None", "ValidateOnly", "ValidateAndLog" });
+            cmbValidationLevel.Location = new Point(169, 92);
+            cmbValidationLevel.Margin = new Padding(4, 3, 4, 3);
+            cmbValidationLevel.Name = "cmbValidationLevel";
+            cmbValidationLevel.Size = new Size(114, 23);
+            cmbValidationLevel.TabIndex = 14;
             // 
             // GeomServiceUI
             // 
@@ -509,5 +546,8 @@
         private CheckBox chkSkipMeshed;
         private GroupBox groupBox2;
         private Button cmdEnumerateFiles;
+        private Label label10;
+        private ComboBox cmbValidationLevel;
+        private CheckBox chkSkipMeshing;
     }
 }

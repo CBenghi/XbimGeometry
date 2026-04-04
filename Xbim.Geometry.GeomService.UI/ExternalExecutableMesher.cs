@@ -48,7 +48,7 @@ namespace Xbim.Geometry.GeomService.UI
         public async Task<string> EnsureGeometryAsync(
             FileInfo f, bool adjustWcs, CancellationToken cancellationToken = default,
             ReportProgressDelegate? progressDelegate = null, LogLevel logLevel = LogLevel.Debug,
-            int maxMemMb = 1024)
+            int maxMemMb = 1024, bool skipGeom = false, ExpressValidation validateLevel = ExpressValidation.None)
         {
             if (ExecutableFullPath == null)
             {
@@ -57,7 +57,7 @@ namespace Xbim.Geometry.GeomService.UI
             if (f.Extension.ToLowerInvariant() == ".ifc" || f.Extension.ToLowerInvariant() == ".ifczip")
             {
                 // needs conversion
-                return await ConvertItAsync(f, adjustWcs, cancellationToken, progressDelegate, logLevel, maxMemMb);
+                return await ConvertItAsync(f, adjustWcs, cancellationToken, progressDelegate, logLevel, maxMemMb, skipGeom, validateLevel);
             }
             return f.FullName;
         }
@@ -86,7 +86,8 @@ namespace Xbim.Geometry.GeomService.UI
                 ];
 
         private async Task<string> ConvertItAsync(FileInfo ifcfile, bool adjustWcs,
-            CancellationToken cancellationToken, ReportProgressDelegate? progressDelegate, LogLevel logLevel, int maxMemMb)
+            CancellationToken cancellationToken, ReportProgressDelegate? progressDelegate,
+            LogLevel logLevel, int maxMemMb, bool skipGeom, ExpressValidation validateLevel)
         {
             var maxMemBytes = maxMemMb * 1024L * 1024L;
             summaryExecution = [];
@@ -112,7 +113,16 @@ namespace Xbim.Geometry.GeomService.UI
                 string stLog = MakeParam("log", RequestLog);
                 string stLogLevel = MakeParam("ll", logLevel);
                 string stProg = MakeParam("progress", true);
-                var thisArguments = string.Join(" ", [infileParam, adjustParam, stParam, stEngine, stLog, stProg, stLogLevel]);
+                List<string> argsList = [infileParam, adjustParam, stParam, stEngine, stLog, stProg, stLogLevel];
+                if (skipGeom)
+                {
+                    argsList.Add(MakeParam("skipgeometry", true));
+                }
+                if (validateLevel != ExpressValidation.None)
+                {
+                    argsList.Add(MakeParam("validate", validateLevel));
+                }
+                var thisArguments = string.Join(" ", argsList);
                 var tFullCommand = $"{ExecutableFullPath} {thisArguments}";
                 Debug.WriteLine(tFullCommand);
 

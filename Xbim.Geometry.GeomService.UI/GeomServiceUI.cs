@@ -44,6 +44,7 @@ namespace Xbim.Geometry.GeomService.UI
             AddLogEntry("!SomeFolder/**/*.ifc -> Exclamation excludes the files");
             AddLogEntry("#!SomeFolder/**/*.ifc -> Lines starting with # are comments and are ignored");
             cmbLoggingLevel.SelectedItem = "Debug";
+            cmbValidationLevel.SelectedItem = "None";
             foreach (var seq in _meshHelper.AttemptSequence)
             {
                 var it = new ListViewItem(seq.ToString())
@@ -224,6 +225,7 @@ namespace Xbim.Geometry.GeomService.UI
             string execLog = GetLogFilePath();
             LogMessageOnListBox($"Logging at {execLog}", _logEntries, listBoxLog, MaxLogEntries);
             var ll = GetLogLevel(cmbLoggingLevel.Text);
+            var vl = GetValidationLevel(cmbValidationLevel.Text);
 
             cmdConvertGeometry.Enabled = false;
             cmdCancelConvertGeometry.Enabled = true;
@@ -243,7 +245,7 @@ namespace Xbim.Geometry.GeomService.UI
                     var fileSize = file.Length.Bytes().Humanize();
                     AddLogEntry($"Processing file: {file.FullName}, {fileSize}", fileLogger);
                     _meshHelper.RequestLog = true;
-                    var meshedFile = await _meshHelper.EnsureGeometryAsync(file, false, _cts.Token, ReportProgressInBar, ll, memoryMax);
+                    var meshedFile = await _meshHelper.EnsureGeometryAsync(file, false, _cts.Token, ReportProgressInBar, ll, memoryMax, chkSkipMeshing.Checked, vl);
                     ReportProgressInBar(0, "File completed");
                     foreach (var logEntry in _meshHelper.SummaryExecution)
                     {
@@ -310,6 +312,16 @@ namespace Xbim.Geometry.GeomService.UI
                 "Critical" => LogLevel.Critical,
                 "Trace" => LogLevel.Trace,
                 _ => LogLevel.Debug,
+            };
+        }
+
+        private ExpressValidation GetValidationLevel(string text)
+        {
+            return text switch
+            {
+                "ValidateOnly" => ExpressValidation.ValidateOnly,
+                "ValidateAndLog" => ExpressValidation.ValidateAndLog,
+                _ => ExpressValidation.None,
             };
         }
 
